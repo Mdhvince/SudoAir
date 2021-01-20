@@ -8,12 +8,16 @@ set(CXX_FLAGS "-Wall")
 #ControlLib
 add_subdirectory(controllib)
 
-#Libtorch
-# find_package(Torch REQUIRED)
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+#OpenCV
+find_package(OpenCV REQUIRED)
+
+message(STATUS "OpenCV library status:")
+message(STATUS "    config: ${OpenCV_DIR}")
+message(STATUS "    version: ${OpenCV_VERSION}")
+message(STATUS "    libraries: ${OpenCV_LIBS}")
+message(STATUS "    include path: ${OpenCV_INCLUDE_DIRS}")
 
 set(EXECUTABLE app)
 add_executable(${EXECUTABLE} main.cpp)
 
-target_link_libraries(${EXECUTABLE} PRIVATE controllib)
-# target_link_libraries(${EXECUTABLE} PRIVATE controllib "${TORCH_LIBRARIES}")
+target_link_libraries(${EXECUTABLE} PRIVATE controllib ${OpenCV_LIBS})

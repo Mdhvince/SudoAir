@@ -33,9 +33,10 @@ std::array<float, 3> simulate_displacement(float gravity, float drone_mass_KG, f
 int main(){
     float gravity {9.81};
     float drone_mass_KG{0.18};
-    float max_motor_thrust_N{1.2 * drone_mass_KG * gravity};
+    float min_motor_thrust_N{drone_mass_KG * (gravity / 2.0)};
+    float max_motor_thrust_N{2 * drone_mass_KG * gravity};
 
-    unique_ptr<PID_Controller> pid = make_unique<PID_Controller>(max_motor_thrust_N, drone_mass_KG);
+    unique_ptr<PID_Controller> pid = make_unique<PID_Controller>(min_motor_thrust_N, max_motor_thrust_N, drone_mass_KG);
 
     // Init sensors
     std::shared_ptr<float> z = std::make_shared<float>(0.0);

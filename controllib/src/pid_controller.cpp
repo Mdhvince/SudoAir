@@ -2,8 +2,8 @@
 #include <cmath>
 #include "controllib/pid_controller.h"
 
-PID_Controller::PID_Controller(const float max_motor_thrust, float drone_mass)
-    :max_motor_thrust{max_motor_thrust},
+PID_Controller::PID_Controller(const float min_motor_thrust, const float max_motor_thrust, float drone_mass)
+    :min_motor_thrust{min_motor_thrust}, max_motor_thrust{max_motor_thrust},
     drone_mass{drone_mass},
     gravity{9.81},
     I_xx{0.018} {
@@ -55,8 +55,8 @@ float PID_Controller::thrust(float z_sensor, float z_des, float z_dot_des, float
     float u_bar = (ff_z_ddot + k_p * error + k_d * error_dot + this->gravity) * this->drone_mass;
     float u = std::min(u_bar, this->max_motor_thrust);
 
-    if(u < 0)
-        u = 0;
+    if(u < this->min_motor_thrust)
+        u = this->min_motor_thrust;
     
     return u;
 }

@@ -9,11 +9,12 @@ protected:
     const float gravity;
     float drone_mass;
     const float max_motor_thrust;
+    const float min_motor_thrust;
     float I_xx;
 
     
 public:
-    PID_Controller(const float max_motor_thrust, float drone_mass);
+    PID_Controller(const float min_motor_thrust, const float max_motor_thrust, float drone_mass);
     PID_Controller();
     PID_Controller(const PID_Controller &source);
     ~PID_Controller();

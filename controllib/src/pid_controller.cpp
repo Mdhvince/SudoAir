@@ -49,15 +49,15 @@ float PID_Controller::turning_moment(float phi_sensor, float phi_cmd, float phi_
 float PID_Controller::thrust(float z_sensor, float z_des, float z_dot_des, float z_dot_sensor, float ff_z_ddot){
     float error {z_des - z_sensor};
     float error_dot {z_dot_des - z_dot_sensor};
-    float k_p {10.0};
-    float k_d {30.0};
+    float k_p {200};
+    float k_d {20};
 
     float u_bar = (ff_z_ddot + k_p * error + k_d * error_dot + this->gravity) * this->drone_mass;
     float u = std::min(u_bar, this->max_motor_thrust);
 
-    if(u < 0.0)
-        u = 0.0;
-
+    if(u < 0)
+        u = 0;
+    
     return u;
 }
 //update ff_z_ddot

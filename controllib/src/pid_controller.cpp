@@ -6,7 +6,8 @@ PID_Controller::PID_Controller(const float min_motor_thrust, const float max_mot
     :min_motor_thrust{min_motor_thrust}, max_motor_thrust{max_motor_thrust},
     drone_mass{drone_mass},
     gravity{9.81},
-    I_xx{0.018} {
+    I_xx{0.1},
+    i_error_z{0.0}, i_error_y{0.0} {
     std::cout<< "Initializing PID Controller\n";
 }
 
@@ -21,44 +22,63 @@ PID_Controller::PID_Controller(const float min_motor_thrust, const float max_mot
 PID_Controller::~PID_Controller(){ }
 
 
-
-float PID_Controller::phi_cmd(float y_sensor, float y_des, float y_dot_des, float y_dot_sensor, float ff_y_ddot){
-    float error {y_des - y_sensor};
-    float error_dot {y_dot_des - y_dot_sensor};
-    float k_p {10.0};
-    float k_d {30.0};
-
-    float phi_c = (-1 / this->gravity) * (ff_y_ddot + k_p * error + k_d * error_dot);
-
-    return phi_c;
-}
-//update ff_y_ddot
-
-float PID_Controller::turning_moment(float phi_sensor, float phi_cmd, float phi_cmd_dot, float phi_dot_sensor){
-    float error {phi_cmd - phi_sensor};
-    float error_dot {phi_cmd_dot - phi_dot_sensor};
-    float k_p {10.0};
-    float k_d {30.0};
+// {z, z_dot, z_ddot, z_des, z_dot_des}, float phi
+float PID_Controller::thrust(std::array<float, 5> &state_z, float phi){
+    float error {state_z.at(3) - state_z.at(0)};
+    float error_dot {state_z.at(4) - state_z.at(1)};
+    this->i_error_z += error;
     
-    float phi_cmd_ddot {0.0};
-    float u2 = this->I_xx * (phi_cmd_ddot + k_p * error + k_d * error_dot);
+    float k_p {1.3};
+    float k_d {2.};
+    float k_i {0.0};
 
-    return u2;
-}
+    float u_bar = state_z.at(2) + k_p * error + k_d * error_dot + k_i * this->i_error_z + this->gravity;
 
-float PID_Controller::thrust(float z_sensor, float z_des, float z_dot_des, float z_dot_sensor, float ff_z_ddot){
-    float error {z_des - z_sensor};
-    float error_dot {z_dot_des - z_dot_sensor};
-    float k_p {200};
-    float k_d {20};
+    float u = (u_bar / std::cos(phi)) * this->drone_mass;
+    // float u = this->drone_mass * (this->gravity - u_bar) / std::cos(phi);
 
-    float u_bar = (ff_z_ddot + k_p * error + k_d * error_dot + this->gravity) * this->drone_mass;
-    float u = std::min(u_bar, this->max_motor_thrust);
+    u = std::min(u, this->max_motor_thrust);
 
     if(u < this->min_motor_thrust)
         u = this->min_motor_thrust;
     
     return u;
 }
-//update ff_z_ddot
+
+
+// Position controller : (Y-axis : Lateral)
+float PID_Controller::phi_cmd(std::array<float, 5> &state_y, float u){
+    float error {state_y.at(3) - state_y.at(0)};
+    float error_dot {state_y.at(4) - state_y.at(1)};
+
+    float k_p {100};
+    float k_d {20.0};
+
+    float y_ddot_cmd = state_y.at(2) + k_p * error + k_d * error_dot;
+
+
+    float val = y_ddot_cmd * (this->drone_mass / -u) ;
+    float boundary1 = std::max((float)-0.99, val);
+    
+    val = std::min((float)0.99, boundary1);
+    float phi_c = asin(val);
+
+    return phi_c;
+}
+
+// Attitude controller : (Orientation : roll/phi -  - ) -> ang and ang rate infos comes from IMU
+//float phi, float phi_dot, float phi_ddot, float phi_cmd, float phi_cmd_dot
+float PID_Controller::turning_moment(std::array<float, 5> &state_phi){
+    float error {state_phi.at(3) - state_phi.at(0)};
+    float error_dot {state_phi.at(4) - state_phi.at(1)};
+    
+    float k_p {180.0};
+    float k_d {10.0};
+
+    float u2 = this->I_xx * (state_phi.at(2) + k_p * error + k_d * error_dot);
+
+    return u2;
+}
+
+
 

@@ -83,11 +83,11 @@ int main(){
     
     float dt {1.};
 
-    unique_ptr<PositionController> pos_ctrl = make_unique<PositionController>();
-    unique_ptr<AttitudeController> att_ctrl = make_unique<AttitudeController>();
+    auto pos_ctrl = make_unique<PositionController>();
+    auto att_ctrl = make_unique<AttitudeController>();
 
     std::array<float, 9> xyz_state {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    std::array<float, 9> xyz_state_des {x_des, y_des, z_des, x_dot_des, y_dot_des, z_dot_des, 0.0, 0.0, 0.0};
+    std::array<float, 9> xyz_state_des {x_des, y_des, z_des, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     std::array<float, 9> angle_state_wf {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     std::array<float, 9> angle_state_wf_des {0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     std::array<float, 3> pqr_state {0.0, 0.0, 0.0};
@@ -107,12 +107,14 @@ int main(){
 
     
 
-    for(int step{0}; step < 10000; step++){
+    for(int step{0}; step < 3000; step++){
                 
-        pos_ctrl->control_position(kp_pos, kd_pos,
+        pos_ctrl->control_altitude(kp_pos, kd_pos,
                                    xyz_state, xyz_state_des,
                                    inp_plant, angle_state_wf_des, pqr_state_des,
                                    drone_mass_KG, gravity, min_motor_thrust_N, max_motor_thrust_N);
+
+        pos_ctrl->control_lateral(xyz_state_des, angle_state_wf_des, pqr_state_des, gravity);
 
         // Attitude controller
         for(int i{0}; i < 10; i++){
@@ -124,9 +126,6 @@ int main(){
             draw_pid_response(img, step, xyz_state.at(2), xyz_state.at(1));
         
 
-        // std::cout<< "X: " << xyz_state.at(0) << " Y: " << xyz_state.at(1) << " Z: " << xyz_state.at(2) <<std::endl;
-
-        // change trajectory
         if((xyz_state.at(1) > 795 && xyz_state.at(1) < 805 && xyz_state.at(2) > 295 && xyz_state.at(2) < 305)){
             xyz_state_des.at(2) = 100;
             xyz_state_des.at(1) = 600;

@@ -6,26 +6,42 @@ AttitudeController::AttitudeController(){ }
 AttitudeController::~AttitudeController(){ }
 
 
+void AttitudeController::desired_torque(std::string angle, float kp, float kd, float inertia,
+                                      std::unordered_map<std::string, float> &state,
+                                      std::unordered_map<std::string, float> &state_des,
+                                      std::unordered_map<std::string, float> &inp_plant){
+    
+    std::string vel {};
+    std::string moment {};
+    if(angle == "phi") {vel = "p"; moment = "u2";}
+    else if (angle == "theta") {vel = "q"; moment = "u3";}
+    else if (angle == "psi") {vel = "r"; moment = "u4";}
+    else {std::cerr<< "Expected angle phi, theta or psi. Got " << angle << " instead."<<std::endl;}
+
+    float err {state_des.at(angle) - state.at(angle)};
+    float err_dot {state_des.at(vel) - state.at(vel)};
+    inp_plant.at(moment) = inertia * (kp * err + kd * err_dot);
+}
+
+
 void AttitudeController::control_attitude(std::array<float, 3> &kp_ang, std::array<float, 3> &kd_ang,
-                                       std::array<float, 3> &pqr_state, std::array<float, 3> &pqr_state_des,
-                                       std::array<float, 9> &angle_state_wf, std::array<float, 9> &angle_state_wf_des,
-                                       std::array<float, 4> &inp_plant, std::array<float, 3> &inertia){
-    // attitude contrl
-    for(size_t idx{0}; idx < pqr_state.size(); idx++){
-        float err {angle_state_wf_des.at(idx) - angle_state_wf.at(idx)};
-        float err_dot {pqr_state_des.at(idx) - pqr_state.at(idx)};
-        inp_plant.at(idx+1) = inertia.at(idx) * (kp_ang.at(idx) * err + kd_ang.at(idx) * err_dot); // moment u2 u3 u4
-    }
+                                          std::unordered_map<std::string, float> &state, std::unordered_map<std::string, float> &state_des,
+                                          std::unordered_map<std::string, float> &inp_plant, std::array<float, 3> &inertia){
+
+    desired_torque("phi", kp_ang.at(0), kd_ang.at(0), inertia.at(0), state, state_des, inp_plant);
+    desired_torque("theta", kp_ang.at(1), kd_ang.at(1), inertia.at(1), state, state_des, inp_plant);
+    desired_torque("psi", kp_ang.at(2), kd_ang.at(2), inertia.at(2), state, state_des, inp_plant);
+
 }
 
 // thanks to equation (6) and (7) from : http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.169.1687&rep=rep1&type=pdf
 // the equation is established at near the hover state. That mean p = phi_dot, q = theta_dot & r = psi_dot
-void AttitudeController::apply_rotor_speed(std::array<float, 4> &inp_plant, float kf, float drone_mass, float gravity){
+void AttitudeController::apply_rotor_speed(std::unordered_map<std::string, float> &inp_plant, float kf, float drone_mass, float gravity){
 
-    float u1 = inp_plant.at(0);
-    float u2 = inp_plant.at(1);
-    float u3 = inp_plant.at(2);
-    float u4 = inp_plant.at(3);
+    float u1 = inp_plant.at("u1");
+    float u2 = inp_plant.at("u2");
+    float u3 = inp_plant.at("u3");
+    float u4 = inp_plant.at("u4");
     float mg = gravity * drone_mass;
     float wh = sqrt((mg/(4*kf)));
 

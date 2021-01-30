@@ -2,6 +2,7 @@
 #define _POSITION_CONTROLLER_H_
 #include <iostream>
 #include <array>
+#include <unordered_map>
 
 
 class PositionController{
@@ -11,14 +12,17 @@ public:
     ~PositionController();
 
     void control_altitude(std::array<float, 3> &kp_pos, std::array<float, 3> &kd_pos,
-                          std::array<float, 9> &xyz_state, std::array<float, 9> &xyz_state_des,
-                          std::array<float, 4> &inp_plant,
-                          std::array<float, 9> &angle_state_wf_des,
-                          std::array<float, 3> &pqr_state_des,
+                          std::unordered_map<std::string, float> &state, std::unordered_map<std::string, float> &state_des,
+                          std::unordered_map<std::string, float> &inp_plant,
                           float drone_mass, float gravity, const float min_motor_thrust, const float max_motor_thrust);
     
-    void control_lateral(std::array<float, 9> &xyz_state_des, std::array<float, 9> &angle_state_wf_des,
-                    std::array<float, 3> &pqr_state_des, float gravity);
+    void control_lateral(std::array<float, 3> &kp_pos, std::array<float, 3> &kd_pos,
+                         std::unordered_map<std::string, float> &state, std::unordered_map<std::string, float> &state_des,
+                         float drone_mass, float gravity, const float min_motor_thrust, const float max_motor_thrust);
+    
+    void desired_acc(std::string axis, float kp, float kd, float min_acc, float max_acc, float min_vel, float max_vel,
+                     std::unordered_map<std::string, float> &state,
+                     std::unordered_map<std::string, float> &state_des);
     
 };
 #endif

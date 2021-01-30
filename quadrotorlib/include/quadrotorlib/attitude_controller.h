@@ -12,10 +12,14 @@ public:
 
 
     void control_attitude(std::array<float, 3> &kp_ang, std::array<float, 3> &kd_ang,
-                          std::array<float, 3> &pqr_state, std::array<float, 3> &pqr_state_des,
-                          std::array<float, 9> &angle_state_wf, std::array<float, 9> &angle_state_wf_des,
-                          std::array<float, 4> &inp_plant, std::array<float, 3> &inertia);
+                          std::unordered_map<std::string, float> &state, std::unordered_map<std::string, float> &state_des,
+                          std::unordered_map<std::string, float> &inp_plant, std::array<float, 3> &inertia);
     
-    void apply_rotor_speed(std::array<float, 4> &inp_plant, float kf, float drone_mass, float gravity);
+    void apply_rotor_speed(std::unordered_map<std::string, float> &inp_plant, float kf, float drone_mass, float gravity);
+
+    void desired_torque(std::string angle, float kp, float kd, float inertia,
+                        std::unordered_map<std::string, float> &state,
+                        std::unordered_map<std::string, float> &state_des,
+                        std::unordered_map<std::string, float> &inp_plant);
 };
 #endif

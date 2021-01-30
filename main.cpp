@@ -13,32 +13,37 @@
 using std::unique_ptr;
 using std::make_unique;
 
-void draw_pid_response(cv::Mat img, int step, float y, float z){
-    cv::Point p = cv::Point(y, z); // (cols, rows)
-    circle(img, p, 3, cv::Scalar(0, 255, 0), 1, cv::LINE_8);
-}
+void show(cv::Mat img, int step, std::unordered_map<std::string, float> &state, std::unordered_map<std::string, float> &state_des){
 
-// Z X Y
-cv::Mat R(float phi, float theta, float psi){
-    
-    cv::Mat rx = (cv::Mat_<float>(3,3) << 
-                   1, 0, 0,
-                   0, cos(phi), -sin(phi),
-                   0, sin(phi),  cos(phi));
+    if(step % 50 == 0){
+        cv::Point p = cv::Point(state.at("y"), state.at("z"));
+        circle(img, p, 3, cv::Scalar(0, 255, 0), 1, cv::LINE_8);
+    }
 
-    cv::Mat ry = (cv::Mat_<float>(3,3) << 
-                   cos(theta), 0, sin(theta),
-                   0, 1, 0,
-                  -sin(theta), 0, cos(theta));
-    
-    cv::Mat rz = (cv::Mat_<float>(3,3) << 
-                   cos(psi), -sin(psi), 0,
-                   sin(psi), cos(psi), 0,
-                   0, 0, 1);
-    
-    cv::Mat r_yx = ry * rx;
-     
-    return rz * r_yx;
+    if((state.at("y") > 795 && state.at("y") < 805 && state.at("z") > 295 && state.at("z") < 305)){
+        state_des.at("z") = 100;
+        state_des.at("y") = 600;
+        cv::Point goal = cv::Point(state_des.at("y"), state_des.at("z"));
+        circle(img, goal, 15, cv::Scalar(0, 0, 255), 1, cv::LINE_8);
+    }
+    if(state.at("y") > 595 && state.at("y") < 605 && state.at("z") > 95 && state.at("z") < 105){
+        state_des.at("z") = 500;
+        state_des.at("y") = 200;
+        cv::Point goal = cv::Point(state_des.at("y"), state_des.at("z"));
+        circle(img, goal, 15, cv::Scalar(0, 0, 255), 1, cv::LINE_8);
+    }
+    if(state.at("y") > 195 && state.at("y") < 205 && state.at("z") > 495 && state.at("z") < 505){
+        state_des.at("z") = 290;
+        state_des.at("y") = 50;
+        cv::Point goal = cv::Point(state_des.at("y"), state_des.at("z"));
+        circle(img, goal, 15, cv::Scalar(0, 0, 255), 1, cv::LINE_8);
+    }
+
+    cv::namedWindow("Image",cv::WINDOW_AUTOSIZE);
+    cv::flip(img, img, 0);
+    cv::imshow("Image", img);
+    cv::waitKey(1);
+    cv::flip(img, img, 0);
 }
 
 void integrate_twice_from(std::string acc, float dt, std::unordered_map<std::string, float> &state, std::unordered_map<std::string, float> &state_des){
@@ -47,6 +52,9 @@ void integrate_twice_from(std::string acc, float dt, std::unordered_map<std::str
     if(acc == "x_ddot") {vel = "x_dot"; pos = "x";}
     else if (acc == "y_ddot") {vel = "y_dot"; pos = "y";}
     else if (acc == "z_ddot") {vel = "z_dot"; pos = "z";}
+    else if (acc == "p") {vel = "phi_dot"; pos = "phi";}
+    else if (acc == "q") {vel = "theta_dot"; pos = "theta";}
+    else if (acc == "r") {vel = "psi_dot"; pos = "psi";}
     else {std::cerr<< "Expected acc x_ddot, y_ddot or z_ddot. Got " << acc << " instead."<<std::endl;}
 
     if(state_des.at(acc) != 0.0){
@@ -59,29 +67,9 @@ void integrate_twice_from(std::string acc, float dt, std::unordered_map<std::str
 
 void simulate_displacement(float dt, std::unordered_map<std::string, float> &state, std::unordered_map<std::string, float> &state_des){
 
-    std::array<std::string, 3> acc_names {"x_ddot", "y_ddot", "z_ddot"};
+    std::array<std::string, 6> acc_names {"x_ddot", "y_ddot", "z_ddot", "p", "q", "r"};
     for(auto &acc_name: acc_names)
         integrate_twice_from(acc_name, dt, state, state_des);
-    
-
-    // for(size_t idx{0}; idx <= 2; idx++){
-    //     if(xyz_state_des.at(idx+6) != 0.0){
-    //         float delta_dot {xyz_state_des.at(idx+6) * dt};
-    //         xyz_state.at(idx+3) = delta_dot;
-    //         float delta_pos {xyz_state.at(idx+3) * dt};
-    //         xyz_state.at(idx) += delta_pos;
-    //     }
-    // }
-
-    // for(size_t idx{0}; idx <= 2; idx++){
-    //     if(angle_state_wf_des.at(idx+6) != 0.0){
-    //         float delta_angle_dot {angle_state_wf_des.at(idx+6) * dt};
-    //         angle_state_wf.at(idx+3) = delta_angle_dot;
-    //         float delta_angle {angle_state_wf.at(idx+3) * dt};
-    //         angle_state_wf.at(idx) += delta_angle;
-    //     }
-    // }
-
 }
 
 
@@ -174,38 +162,10 @@ int main(){
             att_ctrl->apply_rotor_speed(inp_plant, 1.0, drone_mass_KG, gravity);
             simulate_displacement(dt/n_times, state, state_des);
         }
-
-            
-        if(step % 50 == 0)
-            draw_pid_response(img, step, state.at("y"), state.at("z"));
-
-        if((state.at("y") > 795 && state.at("y") < 805 && state.at("z") > 295 && state.at("z") < 305)){
-            state_des.at("z") = 100;
-            state_des.at("y") = 600;
-            cv::Point goal = cv::Point(state_des.at("y"), state_des.at("z"));
-            circle(img, goal, 15, cv::Scalar(0, 0, 255), 1, cv::LINE_8);
-        }
-        if(state.at("y") > 595 && state.at("y") < 605 && state.at("z") > 95 && state.at("z") < 105){
-            state_des.at("z") = 500;
-            state_des.at("y") = 200;
-            cv::Point goal = cv::Point(state_des.at("y"), state_des.at("z"));
-            circle(img, goal, 15, cv::Scalar(0, 0, 255), 1, cv::LINE_8);
-        }
-        if(state.at("y") > 195 && state.at("y") < 205 && state.at("z") > 495 && state.at("z") < 505){
-            state_des.at("z") = 290;
-            state_des.at("y") = 50;
-            cv::Point goal = cv::Point(state_des.at("y"), state_des.at("z"));
-            circle(img, goal, 15, cv::Scalar(0, 0, 255), 1, cv::LINE_8);
-        }
-
+        show(img, step, state, state_des);
     }
-    
 
-    cv::namedWindow("Image",cv::WINDOW_AUTOSIZE);
-    cv::flip(img, img, 0);
-    cv::imshow("Image", img);
     cv::waitKey(0);
-
     std::cout<< "\n\n";
     return 0;
 }

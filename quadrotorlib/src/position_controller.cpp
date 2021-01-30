@@ -58,9 +58,12 @@ void PositionController::control_lateral(std::array<float, 3> &kp_pos, std::arra
     float x_ddot {state_des.at("x_ddot")};
     float y_ddot {state_des.at("y_ddot")};
 
-    state_des.at("phi") = (1/gravity) * (x_ddot * sin(psi) - y_ddot * cos(psi));
-    state_des.at("theta") = (1/gravity) * (x_ddot * cos(psi) + y_ddot * sin(psi));
+    state_des.at("phi") = ((1/gravity) * (x_ddot * sin(psi) - y_ddot * cos(psi))) * (180/M_PI);
+    state_des.at("theta") = ((1/gravity) * (x_ddot * cos(psi) + y_ddot * sin(psi))) * (180/M_PI);
     // yaw in not playing to follow a trajectory so the desired yaw is considered as ok
+
+
+    // std::cout<< state_des.at("phi") <<std::endl;
 
 
     /*desired angular velocity in the body fixed frame (p_des, q_des, r_des)

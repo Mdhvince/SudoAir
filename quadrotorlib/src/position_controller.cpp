@@ -58,8 +58,8 @@ void PositionController::control_lateral(std::array<float, 3> &kp_pos, std::arra
     float x_ddot {state_des.at("x_ddot")};
     float y_ddot {state_des.at("y_ddot")};
 
-    state_des.at("phi") = ((1/gravity) * (x_ddot * sin(psi) - y_ddot * cos(psi))) * (180/M_PI);
-    state_des.at("theta") = ((1/gravity) * (x_ddot * cos(psi) + y_ddot * sin(psi))) * (180/M_PI);
+    state_des.at("phi") = ((1/gravity) * (x_ddot * sinf(psi) - y_ddot * cosf(psi))) * (180/M_PIf32);
+    state_des.at("theta") = ((1/gravity) * (x_ddot * cosf(psi) + y_ddot * sinf(psi))) * (180/M_PIf32);
     // yaw in not playing to follow a trajectory so the desired yaw is considered as ok
 
 

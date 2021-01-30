@@ -43,7 +43,7 @@ void AttitudeController::apply_rotor_speed(std::unordered_map<std::string, float
     float u3 = inp_plant.at("u3");
     float u4 = inp_plant.at("u4");
     float mg = gravity * drone_mass;
-    float wh = sqrt((mg/(4*kf)));
+    float wh = sqrtf((mg/(4*kf)));
 
     float rspeed1 = u1 - u3 + u4 - mg + wh;
     float rspeed2 = u1 + u2 - u4 - mg + wh;

@@ -11,7 +11,7 @@ void AttitudeController::control_attitude(std::array<float, 3> &kp_ang, std::arr
                                        std::array<float, 9> &angle_state_wf, std::array<float, 9> &angle_state_wf_des,
                                        std::array<float, 4> &inp_plant, std::array<float, 3> &inertia){
     // attitude contrl
-    for(u_int idx{0}; idx < pqr_state.size(); idx++){
+    for(size_t idx{0}; idx < pqr_state.size(); idx++){
         float err {angle_state_wf_des.at(idx) - angle_state_wf.at(idx)};
         float err_dot {pqr_state_des.at(idx) - pqr_state.at(idx)};
         inp_plant.at(idx+1) = inertia.at(idx) * (kp_ang.at(idx) * err + kd_ang.at(idx) * err_dot); // moment u2 u3 u4
@@ -20,7 +20,7 @@ void AttitudeController::control_attitude(std::array<float, 3> &kp_ang, std::arr
 
 // thanks to equation (6) and (7) from : http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.169.1687&rep=rep1&type=pdf
 // the equation is established at near the hover state. That mean p = phi_dot, q = theta_dot & r = psi_dot
-std::array<float, 4> AttitudeController::compute_rotor_speed(std::array<float, 4> &inp_plant, float kf, float drone_mass, float gravity){
+void AttitudeController::apply_rotor_speed(std::array<float, 4> &inp_plant, float kf, float drone_mass, float gravity){
 
     float u1 = inp_plant.at(0);
     float u2 = inp_plant.at(1);
@@ -34,9 +34,7 @@ std::array<float, 4> AttitudeController::compute_rotor_speed(std::array<float, 4
     float rspeed3 = u1 + u3 + u4 - mg + wh;
     float rspeed4 = u1 - u2 - u4 - mg + wh;
 
-    std::array<float, 4> desired_rspeed {rspeed1, rspeed2, rspeed3, rspeed4};
-
-    return desired_rspeed;
+    // std::array<float, 4> desired_rspeed {rspeed1, rspeed2, rspeed3, rspeed4};
 }
 
 

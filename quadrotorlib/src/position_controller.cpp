@@ -12,13 +12,13 @@ void PositionController::control_altitude(std::array<float, 3> &kp_pos, std::arr
                                       std::array<float, 3> &pqr_state_des,
                                       float drone_mass, float gravity, const float min_motor_thrust, const float max_motor_thrust){
                                         
-    float max_acc = ((max_motor_thrust - .01) / drone_mass) - gravity;
+    float max_acc = ((max_motor_thrust - static_cast<float>(.01)) / drone_mass) - gravity;
     float min_acc = (min_motor_thrust / drone_mass) - gravity;
 
     for(size_t idx{6}; idx < xyz_state.size(); idx++){
         float err {xyz_state_des.at(idx-6) - xyz_state.at(idx-6)};
 
-        // we can vary our desired velocity in fonction of position error or keep a constant desired velocity
+        // we can vary our desired velocity in fonction of position error OR keep a constant desired velocity
         float velocity_des = xyz_state_des.at(idx-3) + kp_pos.at(idx-6) * err;
         xyz_state_des.at(idx-3) = std::clamp(velocity_des, (float)0.0, (float)0.3);
 

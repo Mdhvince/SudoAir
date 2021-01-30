@@ -16,6 +16,6 @@ public:
                           std::array<float, 9> &angle_state_wf, std::array<float, 9> &angle_state_wf_des,
                           std::array<float, 4> &inp_plant, std::array<float, 3> &inertia);
     
-    std::array<float, 4> compute_rotor_speed(std::array<float, 4> &inp_plant, float kf, float drone_mass, float gravity);
+    void apply_rotor_speed(std::array<float, 4> &inp_plant, float kf, float drone_mass, float gravity);
 };
 #endif

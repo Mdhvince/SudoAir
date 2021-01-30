@@ -1,6 +1,7 @@
 #include <iostream>
 #include <memory>
 #include <array>
+#include <unordered_map>
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -44,7 +45,7 @@ void simulate_displacement(float dt,
                            std::array<float, 9> &xyz_state, std::array<float, 9> &xyz_state_des,
                            std::array<float, 9> &angle_state_wf, std::array<float, 9> &angle_state_wf_des){
 
-    for(u_int idx{0}; idx <= 2; idx++){
+    for(size_t idx{0}; idx <= 2; idx++){
         if(xyz_state_des.at(idx+6) != 0.0){
             float delta_dot {xyz_state_des.at(idx+6) * dt};
             xyz_state.at(idx+3) = delta_dot;
@@ -53,7 +54,7 @@ void simulate_displacement(float dt,
         }
     }
 
-    for(u_int idx{0}; idx <= 2; idx++){
+    for(size_t idx{0}; idx <= 2; idx++){
         if(angle_state_wf_des.at(idx+6) != 0.0){
             float delta_angle_dot {angle_state_wf_des.at(idx+6) * dt};
             angle_state_wf.at(idx+3) = delta_angle_dot;
@@ -68,10 +69,9 @@ void simulate_displacement(float dt,
 int main(){
     float gravity {9.81};
     float drone_mass_KG{0.027};
-    float Ixx {2.3951e-5};
     std::array<float, 3> inertia {2.3951e-5, 2.3951e-5, 2.3951e-5};
     float max_motor_thrust_N{0.5687857};
-    float min_motor_thrust_N{(drone_mass_KG * gravity) - .1};
+    float min_motor_thrust_N{(drone_mass_KG * gravity) - static_cast<float>(.1)};
 
     // From trajectory planner
     float x_des {50.0};
@@ -86,13 +86,42 @@ int main(){
     auto pos_ctrl = make_unique<PositionController>();
     auto att_ctrl = make_unique<AttitudeController>();
 
-    std::array<float, 9> xyz_state {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    std::array<float, 9> xyz_state_des {x_des, y_des, z_des, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    std::array<float, 9> angle_state_wf {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    std::array<float, 9> angle_state_wf_des {0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    std::unordered_map<std::string, float> state {
+        {"x", 0.0}, {"y", 0.0}, {"z", 0.0}, 
+        {"x_dot", 0.0}, {"y_dot", 0.0}, {"z_dot", 0.0}, 
+        {"x_ddot", 0.0}, {"y_ddot", 0.0}, {"z_ddot", 0.0}, 
+        {"phi", 0.0}, {"theta", 0.0}, {"psi", 0.0},
+        {"p", 0.0}, {"q", 0.0}, {"r", 0.0}
+    };
+
+    std::unordered_map<std::string, float> state_des {
+        {"x", x_des}, {"y", y_des}, {"z", z_des}, 
+        {"x_dot", x_dot_des}, {"y_dot", y_dot_des}, {"z_dot", z_dot_des}, 
+        {"x_ddot", 0.0}, {"y_ddot", 0.0}, {"z_ddot", 0.0}, 
+        {"phi", 0.0}, {"theta", 0.0}, {"psi", 0.0},
+        {"p", 0.0}, {"q", 0.0}, {"r", 0.0}
+    };
+
+    // std::unordered_map<std::string, float> inp_plant {
+    //     {"u1", 0.0}, {"u2", 0.0}, {"u3", 0.0}, {"u4", 0.0}
+    // };
+
+    
+
+    /*
+    state
+    des_state
+    */
+    std::array<float, 9> xyz_state {0.0, 100.0, 80.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     std::array<float, 3> pqr_state {0.0, 0.0, 0.0};
+    std::array<float, 9> angle_state_wf {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
+    std::array<float, 9> xyz_state_des {x_des, y_des, z_des, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    std::array<float, 9> angle_state_wf_des {0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     std::array<float, 3> pqr_state_des {0.0, 0.0, 0.0};
+
     std::array<float, 4> inp_plant {0.0, 0.0, 0.0, 0.0};
+
 
     cv::Mat img = cv::Mat::zeros(cv::Size(1500, 700), CV_8UC3);
     cv::Point start = cv::Point(xyz_state.at(1), xyz_state.at(2));
@@ -105,9 +134,29 @@ int main(){
     std::array<float, 3> kp_ang {10., 10., 100.};
     std::array<float, 3> kd_ang {15., 15., 60.};
 
-    
+    const uint n_times {10}; // Inner loop n times faster than outer loop
 
-    for(int step{0}; step < 3000; step++){
+    /*
+    auto sudoAir = make_unique<QuadRotor>(m, inertia, max_motor_thrust_N, min_motor_thrust_N, xyz_state);
+    sudoAir->start_rotors();
+
+    while(true){
+        next_wp = get_next_waypoint();
+
+        if(next_wp == home_wp && waypoint_reached(home_wp)){
+            sudoAir->stop_rotors();
+            break;
+        }
+
+        while(!waypoint_reached(next_wp)){
+            sudoAir->control_position();
+            sudoAir->send_cmd()
+        }
+    }
+
+    */
+
+    for(size_t step{0}; step < 3000; step++){
                 
         pos_ctrl->control_altitude(kp_pos, kd_pos,
                                    xyz_state, xyz_state_des,
@@ -117,10 +166,18 @@ int main(){
         pos_ctrl->control_lateral(xyz_state_des, angle_state_wf_des, pqr_state_des, gravity);
 
         // Attitude controller
-        for(int i{0}; i < 10; i++){
+        for(size_t i{0}; i < n_times; i++){
             att_ctrl->control_attitude(kp_ang, kd_ang, pqr_state, pqr_state_des, angle_state_wf, angle_state_wf_des, inp_plant, inertia);
-            simulate_displacement(dt/10., xyz_state, xyz_state_des, angle_state_wf, angle_state_wf_des);
+            att_ctrl->apply_rotor_speed(inp_plant, 1.0, drone_mass_KG, gravity);
+
+            simulate_displacement(dt/n_times, xyz_state, xyz_state_des, angle_state_wf, angle_state_wf_des);
         }
+
+
+
+
+
+
 
         if(step % 50 == 0)
             draw_pid_response(img, step, xyz_state.at(2), xyz_state.at(1));

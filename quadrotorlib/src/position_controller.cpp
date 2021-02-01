@@ -6,7 +6,7 @@ PositionController::PositionController(){ }
 PositionController::~PositionController(){ }
 
 
-void PositionController::desired_acc(std::string axis, float kp, float kd, float min_acc, float max_acc, float min_vel, float max_vel,
+void PositionController::desired_acc(std::string axis, float kp, float kd, float min_acc, float max_acc,
                                       std::unordered_map<std::string, float> &state,
                                       std::unordered_map<std::string, float> &state_des){
     
@@ -18,58 +18,66 @@ void PositionController::desired_acc(std::string axis, float kp, float kd, float
     else {std::cerr<< "Expected axis x, y or z. Got " << axis << " instead."<<std::endl;}
 
     float err {state_des.at(axis) - state.at(axis)};
-    // we can vary our desired velocity in fonction of position error OR keep a constant desired velocity
-    float vel_des = state_des.at(vel) + kp * err;
-    state_des.at(vel) = std::clamp(vel_des, min_vel, max_vel);
     float err_dot {state_des.at(vel) - state.at(vel)};
 
     float acc_des = state.at(acc) + kd * err_dot + kp * err;
     state_des.at(acc) = std::clamp(acc_des, min_acc, max_acc);
+
+}
+
+std::array <std::array<float, 3>, 3> PositionController::Rot_mat(float phi, float theta, float psi){
+    
+    std::array <std::array<float, 3>, 3> R {{
+        {{ cosf(psi)*cosf(theta)-sinf(phi)*sinf(psi)*sinf(theta), -cosf(phi)*sinf(psi), cosf(psi)*sinf(theta)+cosf(theta)*sinf(phi)*sinf(psi) }},
+        {{ cosf(theta)*sinf(psi)+cosf(psi)*sinf(phi)*sinf(theta), cosf(phi)*cosf(psi), sinf(psi)*sinf(theta)-cosf(theta)*sinf(phi)*cosf(psi) }},
+        {{ -cosf(phi)*sinf(theta), sinf(phi), cosf(phi)*cosf(theta) }}
+    }};
+    return R;
 }
 
 void PositionController::control_altitude(std::array<float, 3> &kp_pos, std::array<float, 3> &kd_pos,
                                       std::unordered_map<std::string, float> &state, std::unordered_map<std::string, float> &state_des,
                                       std::unordered_map<std::string, float> &inp_plant,
                                       float drone_mass, float gravity, const float min_motor_thrust, const float max_motor_thrust){
-                                        
+    
+    float phi {state.at("phi")};
+    float theta {state.at("theta")};
+    float psi {state.at("psi")};
+    float R_b3 = Rot_mat(phi, theta, psi)[2][2];
+
     float max_acc = ((max_motor_thrust - static_cast<float>(.01)) / drone_mass) - gravity;
     float min_acc = (min_motor_thrust / drone_mass) - gravity;
-    float max_vel = .3;
-    float min_vel = .0;
 
-    desired_acc("z", kp_pos.at(2), kd_pos.at(2), min_acc, max_acc, min_vel, max_vel, state, state_des);
-    inp_plant.at("u1") = drone_mass * (gravity + state_des.at("z_ddot"));
+    desired_acc("z", kp_pos.at(2), kd_pos.at(2), min_acc, max_acc, state, state_des);
+    
+    state_des.at("z_ddot") /= R_b3; // projecttion of the acceleration vector along the z-body axis
+    float u1 = drone_mass * (gravity + state_des.at("z_ddot"));
+ 
+    inp_plant.at("u1") = std::clamp(u1, min_motor_thrust, max_motor_thrust);
 }
 
 void PositionController::control_lateral(std::array<float, 3> &kp_pos, std::array<float, 3> &kd_pos,
                                          std::unordered_map<std::string, float> &state,
                                          std::unordered_map<std::string, float> &state_des,
+                                         std::unordered_map<std::string, float> &inp_plant,
                                          float drone_mass, float gravity, const float min_motor_thrust, const float max_motor_thrust){
 
     float max_acc = ((max_motor_thrust - static_cast<float>(.01)) / drone_mass) - gravity;
     float min_acc = (min_motor_thrust / drone_mass) - gravity;
-    float max_vel = .3;
-    float min_vel = .0;
 
-    desired_acc("x", kp_pos.at(0), kd_pos.at(0), min_acc, max_acc, min_vel, max_vel, state, state_des);
-    desired_acc("y", kp_pos.at(1), kd_pos.at(1), min_acc, max_acc, min_vel, max_vel, state, state_des);
+    desired_acc("x", kp_pos.at(0), kd_pos.at(0), min_acc, max_acc, state, state_des);
+    desired_acc("y", kp_pos.at(1), kd_pos.at(1), min_acc, max_acc, state, state_des);
     
-    float psi {state_des.at("psi")};
+    // normalize acceleration by the thrust vector
+    state_des.at("x_ddot") /= inp_plant.at("u1");
+    state_des.at("y_ddot") /= inp_plant.at("u1");
+
     float x_ddot {state_des.at("x_ddot")};
     float y_ddot {state_des.at("y_ddot")};
+    float psi {state_des.at("psi")};
 
-    state_des.at("phi") = ((1/gravity) * (x_ddot * sinf(psi) - y_ddot * cosf(psi))) * (180/M_PIf32);
-    state_des.at("theta") = ((1/gravity) * (x_ddot * cosf(psi) + y_ddot * sinf(psi))) * (180/M_PIf32);
-    // yaw in not playing to follow a trajectory so the desired yaw is considered as ok
-
-
-    // std::cout<< state_des.at("phi") <<std::endl;
-
-
-    /*desired angular velocity in the body fixed frame (p_des, q_des, r_des)
-    when working near hover p_des and q_des are 0. Since yaw (psi) in not
-    playing to follow the trajectory, we set r_des (yaw angular velocity in
-    body-fixed frame = yaw_ddot_desired (yaw angular vel in the inertial frame)*/
-    state_des.at("r") = state_des.at("psi_dot");
+    // cmd
+    state_des.at("phi") = (1/gravity) * (x_ddot * sinf(psi) - y_ddot * cosf(psi));
+    state_des.at("theta") = (1/gravity) * (x_ddot * cosf(psi) + y_ddot * sinf(psi));
 
 }

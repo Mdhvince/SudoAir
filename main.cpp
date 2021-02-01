@@ -2,6 +2,7 @@
 #include <memory>
 #include <array>
 #include <unordered_map>
+#include <fstream>
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -47,6 +48,7 @@ void show(cv::Mat img, int step, std::unordered_map<std::string, float> &state, 
 }
 
 void integrate_twice_from(std::string acc, float dt, std::unordered_map<std::string, float> &state, std::unordered_map<std::string, float> &state_des){
+    // dead reckoning methode (Integrate the measurement of the sensor, to get the real position)
     std::string vel {};
     std::string pos {};
     if(acc == "x_ddot") {vel = "x_dot"; pos = "x";}
@@ -66,6 +68,12 @@ void integrate_twice_from(std::string acc, float dt, std::unordered_map<std::str
 }
 
 void simulate_displacement(float dt, std::unordered_map<std::string, float> &state, std::unordered_map<std::string, float> &state_des){
+
+    // Just a simulation, here I assume that we've reach all the desired accelerations
+    // And then I apply dead reckoning to find my position.
+    // I can do the same on real drone but by taking the measurement from the sensor and then apply dead reckoning.
+    // But better approach can be better like : 
+    // complementary filter / Kalman Filter / Extended Kalman Filter / Particle Filter 
 
     std::array<std::string, 6> acc_names {"x_ddot", "y_ddot", "z_ddot", "p", "q", "r"};
     for(auto &acc_name: acc_names)
@@ -149,11 +157,13 @@ int main(){
     */
 
     for(size_t step{0}; step < 3000; step++){
+        show(img, step, state, state_des);
                 
         pos_ctrl->control_altitude(kp_pos, kd_pos, state, state_des, inp_plant,
                                    drone_mass_KG, gravity, min_motor_thrust_N, max_motor_thrust_N);
+        // Here I have to send u1 to the plant
 
-        pos_ctrl->control_lateral(kp_pos, kd_pos, state, state_des,
+        pos_ctrl->control_lateral(kp_pos, kd_pos, state, state_des, inp_plant,
                                   drone_mass_KG, gravity, min_motor_thrust_N, max_motor_thrust_N);
 
         // Attitude controller
@@ -162,7 +172,8 @@ int main(){
             att_ctrl->apply_rotor_speed(inp_plant, 1.0, drone_mass_KG, gravity);
             simulate_displacement(dt/n_times, state, state_des);
         }
-        show(img, step, state, state_des);
+        
+        
     }
 
     cv::waitKey(0);

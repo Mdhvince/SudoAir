@@ -10,22 +10,24 @@ class PositionController{
 public:
     PositionController();
     ~PositionController();
-
-    void control_altitude(std::array<float, 3> &kp_pos, std::array<float, 3> &kd_pos,
-                          std::unordered_map<std::string, float> &state, std::unordered_map<std::string, float> &state_des,
-                          std::unordered_map<std::string, float> &inp_plant,
-                          float drone_mass, float gravity, const float min_motor_thrust, const float max_motor_thrust);
-    
-    void control_lateral(std::array<float, 3> &kp_pos, std::array<float, 3> &kd_pos,
-                         std::unordered_map<std::string, float> &state, std::unordered_map<std::string, float> &state_des,
-                         std::unordered_map<std::string, float> &inp_plant,
-                         float drone_mass, float gravity, const float min_motor_thrust, const float max_motor_thrust);
-    
-    void desired_acc(std::string axis, float kp, float kd, float min_acc, float max_acc,
-                     std::unordered_map<std::string, float> &state,
-                     std::unordered_map<std::string, float> &state_des);
     
     std::array <std::array<float, 3>, 3> Rot_mat(float phi, float theta, float psi);
+
+
+    // non linear controller
+    float desired_acc(std::string axis, float kp, float kd,
+                       std::unordered_map<std::string, float> &state,
+                       std::unordered_map<std::string, float> &state_des, float &ff_term);
+
+    std::array<float, 3> R_b3(float phi, float theta, float psi);
+
+    float thrust_cmd(std::array<float, 3> &kp_pos, std::array<float, 3> &kd_pos,
+                           std::unordered_map<std::string, float> &state, std::unordered_map<std::string, float> &state_des,
+                           float m, float g, const float min_F, const float max_F, float &z_ff);
+
+    void angle_cmd(std::array<float, 3> &kp_pos, std::array<float, 3> &kd_pos,
+                          std::unordered_map<std::string, float> &state, std::unordered_map<std::string, float> &state_des,
+                          float m, float g, const float min_F, const float max_F, float &x_ff, float &y_ff);
     
 };
 #endif

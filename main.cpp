@@ -5,7 +5,6 @@
 #include <fstream>
 
 #include <opencv2/opencv.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
 
 #include "quadrotorlib/include/quadrotorlib/position_controller.h"
 #include "quadrotorlib/include/quadrotorlib/attitude_controller.h"
@@ -47,46 +46,42 @@ void show(cv::Mat img, int step, std::unordered_map<std::string, float> &state, 
     cv::flip(img, img, 0);
 }
 
-void integrate_twice_from(std::string acc, float dt, std::unordered_map<std::string, float> &state, std::unordered_map<std::string, float> &state_des){
-    // dead reckoning methode (Integrate the measurement of the sensor, to get the real position)
-    std::string vel {};
-    std::string pos {};
-    if(acc == "x_ddot") {vel = "x_dot"; pos = "x";}
-    else if (acc == "y_ddot") {vel = "y_dot"; pos = "y";}
-    else if (acc == "z_ddot") {vel = "z_dot"; pos = "z";}
-    else if (acc == "p") {vel = "phi_dot"; pos = "phi";}
-    else if (acc == "q") {vel = "theta_dot"; pos = "theta";}
-    else if (acc == "r") {vel = "psi_dot"; pos = "psi";}
-    else {std::cerr<< "Expected acc x_ddot, y_ddot or z_ddot. Got " << acc << " instead."<<std::endl;}
+void sense_sim(float dt, std::unordered_map<std::string, float> &state, float &x_ff, float &y_ff, float &z_ff){
 
-    if(state_des.at(acc) != 0.0){
-        float delta_dot {state_des.at(acc) * dt};
-        state.at(vel) = delta_dot;
-        float delta_pos {state.at(vel) * dt};
-        state.at(pos) += delta_pos;
+    if(z_ff != 0.0){
+        float delta_dot {z_ff * dt};
+        state.at("z_dot") = delta_dot;
+        float delta_pos {state.at("z_dot") * dt};
+        state.at("z") += delta_pos;
     }
-}
-
-void simulate_displacement(float dt, std::unordered_map<std::string, float> &state, std::unordered_map<std::string, float> &state_des){
-
-    // Just a simulation, here I assume that we've reach all the desired accelerations
-    // And then I apply dead reckoning to find my position.
-    // I can do the same on real drone but by taking the measurement from the sensor and then apply dead reckoning.
-    // But better approach can be better like : 
-    // complementary filter / Kalman Filter / Extended Kalman Filter / Particle Filter 
-
-    std::array<std::string, 6> acc_names {"x_ddot", "y_ddot", "z_ddot", "p", "q", "r"};
-    for(auto &acc_name: acc_names)
-        integrate_twice_from(acc_name, dt, state, state_des);
+    if(y_ff != 0.0){
+        float delta_dot {y_ff * dt};
+        state.at("y_dot") = delta_dot;
+        float delta_pos {state.at("y_dot") * dt};
+        state.at("y") += delta_pos;
+    }
+    if(x_ff != 0.0){
+        float delta_dot {x_ff * dt};
+        state.at("x_dot") = delta_dot;
+        float delta_pos {state.at("x_dot") * dt};
+        state.at("x") += delta_pos;
+    }
+    
 }
 
 
 int main(){
-    float gravity {9.81};
-    float drone_mass_KG{0.027};
+    float g {9.81};
+    float m{0.027};
     std::array<float, 3> inertia {2.3951e-5, 2.3951e-5, 2.3951e-5};
-    float max_motor_thrust_N{0.5687857};
-    float min_motor_thrust_N{(drone_mass_KG * gravity) - static_cast<float>(.1)};
+    float max_F{0.5687857};
+    float min_F{0.16};
+
+    std::unordered_map<std::string, float> quad_specs {
+        {"mass", 0.027}, {"Ixx", 2.3951e-5}, {"Iyy", 2.3951e-5}, {"Izz", 2.3951e-5},
+        {"max_thrust", 0.5687857}, {"min_thrust", 0.16}, {"Iyy", 2.3951e-5}, {"Izz", 2.3951e-5},
+    };
+    
 
     // From trajectory planner
     float x_des {50.0};
@@ -101,22 +96,19 @@ int main(){
     auto pos_ctrl = make_unique<PositionController>();
     auto att_ctrl = make_unique<AttitudeController>();
 
+    float x_ff {0.0};
+    float y_ff {0.0};
+    float z_ff {0.0};
+
     std::unordered_map<std::string, float> state {
-        {"x", 0.0}, {"y", 0.0}, {"z", 0.0}, 
-        {"x_dot", 0.0}, {"y_dot", 0.0}, {"z_dot", 0.0}, 
-        {"x_ddot", 0.0}, {"y_ddot", 0.0}, {"z_ddot", 0.0}, 
-        {"phi", 0.0}, {"theta", 0.0}, {"psi", 0.0},
-        {"phi_dot", 0.0}, {"theta_dot", 0.0}, {"psi_dot", 0.0},
-        {"p", 0.0}, {"q", 0.0}, {"r", 0.0}
+        {"x", 0.0}, {"y", 0.0}, {"z", 0.0}, {"x_dot", 0.0}, {"y_dot", 0.0}, {"z_dot", 0.0}, 
+        {"phi", 0.0}, {"theta", 0.0}, {"psi", 0.0}, {"p", 0.0}, {"q", 0.0}, {"r", 0.0}
     };
 
     std::unordered_map<std::string, float> state_des {
-        {"x", x_des}, {"y", y_des}, {"z", z_des}, 
-        {"x_dot", x_dot_des}, {"y_dot", y_dot_des}, {"z_dot", z_dot_des}, 
-        {"x_ddot", 0.0}, {"y_ddot", 0.0}, {"z_ddot", 0.0}, 
-        {"phi", 0.0}, {"theta", 0.0}, {"psi", 0.0},
-        {"phi_dot", 0.0}, {"theta_dot", 0.0}, {"psi_dot", 0.0},
-        {"p", 0.0}, {"q", 0.0}, {"r", 0.0}
+        {"x", x_des}, {"y", y_des}, {"z", z_des}, {"x_dot", x_dot_des}, {"y_dot", y_dot_des}, {"z_dot", z_dot_des}, 
+        {"x_ddot", 0.0}, {"y_ddot", 0.0}, {"z_ddot", 0.0}, {"phi", 0.0}, {"theta", 0.0}, {"psi", 0.0},
+        {"phi_dot", 0.0}, {"theta_dot", 0.0}, {"psi_dot", 0.0}, {"p", 0.0}, {"q", 0.0}, {"r", 0.0}
     };
 
     std::unordered_map<std::string, float> inp_plant {
@@ -136,43 +128,24 @@ int main(){
 
     const uint n_times {10}; // Inner loop n times faster than outer loop
 
-    /*
-    auto sudoAir = make_unique<QuadRotor>(m, inertia, max_motor_thrust_N, min_motor_thrust_N, xyz_state);
-    sudoAir->start_rotors();
-
-    while(true){
-        next_wp = get_next_waypoint();
-
-        if(next_wp == home_wp && waypoint_reached(home_wp)){
-            sudoAir->stop_rotors();
-            break;
-        }
-
-        while(!waypoint_reached(next_wp)){
-            sudoAir->control_position();
-            sudoAir->send_cmd()
-        }
-    }
-
-    */
-
     for(size_t step{0}; step < 3000; step++){
         show(img, step, state, state_des);
-                
-        pos_ctrl->control_altitude(kp_pos, kd_pos, state, state_des, inp_plant,
-                                   drone_mass_KG, gravity, min_motor_thrust_N, max_motor_thrust_N);
-        // Here I have to send u1 to the plant
 
-        pos_ctrl->control_lateral(kp_pos, kd_pos, state, state_des, inp_plant,
-                                  drone_mass_KG, gravity, min_motor_thrust_N, max_motor_thrust_N);
+        // here I'm simulating that we've reached the desired acceleration so z_ff = z_ddot desired.
+        // In real application z_ff (etc.) will come from the accelerometer.
+        x_ff = state_des.at("x_ddot");
+        y_ff = state_des.at("y_ddot");
+        z_ff = state_des.at("z_ddot");
+
+        
+        float F = pos_ctrl->thrust_cmd(kp_pos, kd_pos, state, state_des, m, g, min_F, max_F, z_ff);
+        pos_ctrl->angle_cmd(kp_pos, kd_pos, state, state_des, m, g, min_F, max_F, x_ff, y_ff);
 
         // Attitude controller
         for(size_t i{0}; i < n_times; i++){
             att_ctrl->control_attitude(kp_ang, kd_ang, state, state_des, inp_plant, inertia);
-            att_ctrl->apply_rotor_speed(inp_plant, 1.0, drone_mass_KG, gravity);
-            simulate_displacement(dt/n_times, state, state_des);
-        }
-        
+            sense_sim(dt/n_times, state, x_ff, y_ff, z_ff);
+        }        
         
     }
 

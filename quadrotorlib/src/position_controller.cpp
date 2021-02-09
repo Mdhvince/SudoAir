@@ -49,7 +49,6 @@ float PositionController::thrust_cmd(std::array<float, 3> &kp_pos, std::array<fl
                           std::unordered_map<std::string, float> &state, std::unordered_map<std::string, float> &state_des,
                           float m, float g, const float min_F, const float max_F, float &z_ff){
     
-    // position controller Z
     float z_ddot_des = this->desired_acc("z", kp_pos.at(2), kd_pos.at(2), state, state_des, z_ff);
     float F_hover = m * (z_ddot_des + g);
 
@@ -72,7 +71,9 @@ void PositionController::angle_cmd(std::array<float, 3> &kp_pos, std::array<floa
     float min_acc = (min_F / m) - g;
     float psi = state.at("psi");
 
-    // position controller X Y
+    float max_roll_pitch {45 * (M_PIf32/180)};
+    float min_roll_pitch {-45 * (M_PIf32/180)};
+
     float x_ddot_des = this->desired_acc("x", kp_pos.at(0), kd_pos.at(0), state, state_des, x_ff);
     float y_ddot_des = this->desired_acc("y", kp_pos.at(1), kd_pos.at(1), state, state_des, y_ff);
 
@@ -83,10 +84,14 @@ void PositionController::angle_cmd(std::array<float, 3> &kp_pos, std::array<floa
     float theta_c = (1 / g) * x_ddot_des * cosf(psi) + y_ddot_des * sinf(psi);
     float psi_c = psi;
 
+    phi_c = std::clamp(phi_c, min_roll_pitch, max_roll_pitch);
+    theta_c = std::clamp(theta_c, min_roll_pitch, max_roll_pitch);
+
     // updates
     state_des.at("x_ddot") = x_ddot_des;
     state_des.at("y_ddot") = y_ddot_des;
     state_des.at("phi") = phi_c;
     state_des.at("theta") = theta_c;
     state_des.at("psi") = psi_c;
+
 }

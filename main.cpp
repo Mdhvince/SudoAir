@@ -2,7 +2,6 @@
 #include <memory>
 #include <array>
 #include <unordered_map>
-#include <fstream>
 
 #include <opencv2/opencv.hpp>
 
@@ -46,8 +45,10 @@ void show(cv::Mat img, int step, std::unordered_map<std::string, float> &state, 
     cv::flip(img, img, 0);
 }
 
-void sense_sim(float dt, std::unordered_map<std::string, float> &state, float &x_ff, float &y_ff, float &z_ff){
-
+void update_state(float dt, std::unordered_map<std::string, float> &state, float &x_ff, float &y_ff, float &z_ff){
+    // Here it will be more sophisticated that simple integration. I will need to use sensor fusion
+    // in order to get very precise info about x_ff first and then deduce on the position.
+    // I will need also to read p q r and then transform to phi theta psi.
     if(z_ff != 0.0){
         float delta_dot {z_ff * dt};
         state.at("z_dot") = delta_dot;
@@ -72,8 +73,8 @@ void sense_sim(float dt, std::unordered_map<std::string, float> &state, float &x
 
 int main(){
     float g {9.81};
-    float m{0.027};
-    std::array<float, 3> inertia {2.3951e-5, 2.3951e-5, 2.3951e-5};
+    float m{0.027}; // approx l^3
+    std::array<float, 3> inertia {2.3951e-5, 2.3951e-5, 2.3951e-5}; //approx l^5
     float max_F{0.5687857};
     float min_F{0.16};
 
@@ -131,21 +132,19 @@ int main(){
     for(size_t step{0}; step < 3000; step++){
         show(img, step, state, state_des);
 
-        // here I'm simulating that we've reached the desired acceleration so z_ff = z_ddot desired.
-        // In real application z_ff (etc.) will come from the accelerometer.
-        x_ff = state_des.at("x_ddot");
-        y_ff = state_des.at("y_ddot");
-        z_ff = state_des.at("z_ddot");
-
-        
         float F = pos_ctrl->thrust_cmd(kp_pos, kd_pos, state, state_des, m, g, min_F, max_F, z_ff);
         pos_ctrl->angle_cmd(kp_pos, kd_pos, state, state_des, m, g, min_F, max_F, x_ff, y_ff);
 
         // Attitude controller
         for(size_t i{0}; i < n_times; i++){
             att_ctrl->control_attitude(kp_ang, kd_ang, state, state_des, inp_plant, inertia);
-            sense_sim(dt/n_times, state, x_ff, y_ff, z_ff);
-        }        
+
+            // In real application z_ff (etc.) will come from the accelerometer.
+            x_ff = state_des.at("x_ddot");
+            y_ff = state_des.at("y_ddot");
+            z_ff = state_des.at("z_ddot");
+            update_state(dt/n_times, state, x_ff, y_ff, z_ff);
+        }
         
     }
 

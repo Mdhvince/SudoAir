@@ -6,40 +6,78 @@ AttitudeController::AttitudeController(){ }
 AttitudeController::~AttitudeController(){ }
 
 
-void AttitudeController::control_attitude(std::array<float, 3> &kp_ang, std::array<float, 3> &kd_ang,
-                                          std::unordered_map<std::string, float> &state, std::unordered_map<std::string, float> &state_des,
-                                          std::unordered_map<std::string, float> &inp_plant, std::array<float, 3> &inertia){
+Eigen::Vector3f AttitudeController::attitude(Eigen::Vector3f &kp_ang, Eigen::Vector3f &kd_ang,
+                                             Eigen::Vector3f &kp_pqr, Eigen::Vector3f &kd_pqr,
+                                             Eigen::Vector3f &ang, Eigen::Vector3f &ang_des,
+                                             Eigen::Vector3f &pqr, Eigen::Vector3f &pqr_cmd,
+                                             Eigen::Vector3f &acc_cmd, Eigen::Matrix3f &R,
+                                             Eigen::Vector3f &inertia, float thrust, float m){
     
-    // att controller    
-    float err_phi = state_des.at("phi") - state.at("phi");
-    float err_theta = state_des.at("theta") - state.at("theta");
-    float err_psi = state_des.at("psi") - state.at("psi");
-    
-    float err_p = state_des.at("p") - state.at("p");
-    float err_q = state_des.at("q") - state.at("q");
-    float err_r = state_des.at("r") - state.at("r");
+    // roll pitch (receive phi theta from the drone)
+    if (thrust > 0) {
+        thrust = -thrust / m;
+        
+        float min_angle = -45. * (M_PIf32/180.);
+        float max_angle = 45. * (M_PIf32/180.);
+        float phi_cmd_dot = kp_ang(0) * (std::clamp(acc_cmd(0) / thrust, min_angle, max_angle) - R(0, 2));
+        float theta_cmd_dot = kp_ang(1) * (std::clamp(acc_cmd(1) / thrust, min_angle, max_angle) - R(1, 2));
 
-    float M1 = inertia.at(0) * (kp_ang.at(0) * err_phi * kd_ang.at(0) * err_p);
-    float M2 = inertia.at(1) * (kp_ang.at(1) * err_theta * kd_ang.at(1) * err_q);
-    float M3 = inertia.at(2) * (kp_ang.at(2) * err_psi * kd_ang.at(2) * err_r);
+        Eigen::Matrix<float, 2, 2> rot_w2b;
+        rot_w2b << R(1, 0), -R(0, 0), 
+                R(1, 1), -R(0, 1);
+        
+        rot_w2b /= R(2, 2);
+
+        Eigen::Vector2f ang_vel;
+        ang_vel << phi_cmd_dot, theta_cmd_dot;
+
+        Eigen::Vector2f pq_cmd;
+        pq_cmd = rot_w2b * ang_vel;
+
+        pqr_cmd(0) = pq_cmd(0);
+        pqr_cmd(1) = pq_cmd(1);
+    }
+    else{
+        pqr_cmd(0) = 0.0;
+        pqr_cmd(1) = 0.0;
+    }
+    
+    // yaw (receive psi from the drone)
+    ang_des(2) = std::clamp(ang_des(2), -2*M_PIf32, 2*M_PIf32);
+
+    float err_yaw = ang_des(2) - ang(2);
+    if (err_yaw > M_PIf32)
+        err_yaw -= 2 * M_PIf32;
+
+    if (err_yaw < -M_PIf32)
+        err_yaw += 2 * M_PIf32;
+    
+    pqr_cmd(2) = kp_ang(2) * err_yaw;
+
+
+    // body rate (receive pqr from the drone)
+    Eigen::Vector3f M = inertia.cwiseProduct(kp_pqr.cwiseProduct(pqr_cmd - pqr));
+
+    return M;
 }
 
-// // thanks to equation (6) and (7) from : http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.169.1687&rep=rep1&type=pdf
-// // the equation is established at near the hover state. That mean p = phi_dot, q = theta_dot & r = psi_dot
-// void AttitudeController::apply_rotor_speed(std::unordered_map<std::string, float> &inp_plant, float kf, float drone_mass, float gravity){
 
-//     float u1 = inp_plant.at("u1");   // [N]
-//     float u2 = inp_plant.at("u2");   // [N m]
-//     float u3 = inp_plant.at("u3");   // [N m]
-//     float u4 = inp_plant.at("u4");   // [N m]
-//     float mg = gravity * drone_mass; // [N]
-//     float wh = sqrtf((mg/(4*kf)));   // [N]
+Eigen::Vector4f AttitudeController::apply_rotor_speed(float l, Eigen::Vector3f &M, float thrust){
 
-//     float rspeed1 = u1 - u3 + u4 - mg + wh; // front left  [rad/s]
-//     float rspeed2 = u1 + u2 - u4 - mg + wh; // front right [rad/s]
-//     float rspeed3 = u1 + u3 + u4 - mg + wh; // rear right  [rad/s]
-//     float rspeed4 = u1 - u2 - u4 - mg + wh; // rear left   [rad/s]
-// }
+    float drag_thrust_ratio = 1.;                                    
+    float t1 = M(0) / l;
+    float t2 = M(1) / l;
+    float t3 = -M(2) / drag_thrust_ratio;
+    float t4 = thrust;
+
+    Eigen::Vector4f cmd_N;
+    cmd_N << (t1 + t2 + t3 + t4)/4.,  // front left  - f1
+             (-t1 + t2 - t3 + t4)/4., // front right - f2
+             (t1 - t2 - t3 + t4)/4.,  // rear left   - f4
+             (-t1 - t2 + t3 + t4)/4.f; // rear right  - f3
+
+    return cmd_N;
+}
 
 
 

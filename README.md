@@ -12,3 +12,7 @@ Goal: Desining controller(s) in C++ for the CrazyFlie mini drone and additional 
 - xyz_state_des: Same for desired states
 - angle_state_wf: `phi, theta, psi, phi_dot, theta_dot, psi_dot, phi_ddot, theta_ddot, psi_ddot - (World frame)`
 - angle_state_wf_des: `Same for desired/cmd state angles - (World frame)`
+
+#### install
+install openCV : https://docs.opencv.org/4.x/d7/d9f/tutorial_linux_install.html then `sudo make install`  
+download Eigen library : https://eigen.tuxfamily.org/index.php?title=Main_Page then extract and place the extracted folder in `usr/local/include`

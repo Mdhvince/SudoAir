@@ -9,7 +9,7 @@ set(CXX_FLAGS "-Wall")
 add_subdirectory(quadrotorlib)
 
 #OpenCV
-find_package(OpenCV REQUIRED)
+find_package(OpenCV REQUIRED) 
 
 set(EXECUTABLE app)
 add_executable(${EXECUTABLE} main.cpp)

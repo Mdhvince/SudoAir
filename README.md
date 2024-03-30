@@ -1,4 +1,3 @@
-## SudoAir
 Goal: Desining controller(s) in C++ for the CrazyFlie mini drone and additional computer vision based modules to allow the drone to navigate in total autonomy in complex environment.  
 
 (I'm looking for a c++ API where I can input the sum of the thrust u1 and the moment (torque) u2, u3, u4) to a simulated quadrotor) -> If you know one, please contact :).
